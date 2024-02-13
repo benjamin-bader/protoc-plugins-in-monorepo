@@ -1,0 +1,68 @@
+plugins {
+    alias libs.plugins.kotlin.jvm
+    alias libs.plugins.protobuf
+
+    id 'application'
+}
+
+application {
+    mainClassName = 'com.example.consumer.MainKt'
+}
+
+// According to Gradle, the proper way to consume a built artifact from another module
+// is to use configurations.  This one's a "consumer" configuration, a mirror of the
+// "producer" configuration in the other module.
+//
+// See https://docs.gradle.org/current/userguide/cross_project_publications.html#sec:simple-sharing-artifacts-between-projects
+configurations {
+    pluginConsumer {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = true
+    }
+}
+
+dependencies {
+    implementation platform(libs.kotlin.bom)
+    implementation libs.kotlin.stdlib
+    implementation libs.protobuf.java
+    implementation libs.protobuf.kotlin
+
+    // Here, we're adding the protoc plugin as a dependency to our consumer configuration,
+    // taking care to consume _from_ the special configuration we created in the producer
+    // module.  Holy manual labor, Batman!
+    pluginConsumer project(path: ":protoc-plugin", configuration: "protocPlugin")
+}
+
+protobuf {
+    protoc {
+        artifact = libs.protobuf.protoc.get().toString()
+    }
+
+    plugins {
+        example {
+            // Finally, the culmination of all our hard work: we need to tell the
+            // plugin where to find the JAR file we consumed from the producer module.
+            // This part is a little sad, because by calling 'singleFile.path' we are
+            // discarding all dependency-tracking information.
+            //
+            // Can't be helped though - the protobuf plugin expects a string for a path.
+            //
+            // (I can't figure out if it's possible to use 'artifact' instead of 'path' - seems like "no".)
+            path = configurations.pluginConsumer.singleFile.path
+        }
+    }
+
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                example {}
+            }
+
+            // This part is gross; I wish the configuration usage would
+            // do this for us - it would be so much better if we didn't
+            // need to assume a particular task.
+            task.dependsOn ":protoc-plugin:shadowJar"
+        }
+    }
+}

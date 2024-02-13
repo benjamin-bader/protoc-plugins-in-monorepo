@@ -1,0 +1,40 @@
+plugins {
+    id 'application'
+
+    alias libs.plugins.kotlin.jvm
+    alias libs.plugins.shadow
+}
+
+application {
+    mainClassName = 'com.example.MainKt'
+
+    // You might wonder whether we need to specify an application name here.
+    // Ordinarily, protoc expects a plugin named "foo" to have the binary name
+    // "protoc-gen-foo". However, the protobuf plugin treats '.jar' plugins specially
+    // and will create a trampoline shell script with the expected name, automatically.
+}
+
+// According to Gradle docs, the "correct" way to share artifacts between modules is to
+// use configurations.
+// https://docs.gradle.org/current/userguide/cross_project_publications.html#sec:simple-sharing-artifacts-between-projects
+configurations {
+    protocPlugin {
+        canBeConsumed = true
+        canBeResolved = false
+
+        outgoing {
+            artifacts {
+                // Because we want to use a single jar as our plugin, we'll use the shadow jar
+                // as the "published" artifact.
+                artifact(shadowJar)
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation platform(libs.kotlin.bom)
+    implementation libs.bundles.kotlin
+    implementation libs.kotlinPoet
+    implementation libs.protobuf.java
+}
