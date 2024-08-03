@@ -59,10 +59,9 @@ protobuf {
                 example {}
             }
 
-            // This part is gross; I wish the configuration usage would
-            // do this for us - it would be so much better if we didn't
-            // need to assume a particular task.
-            task.dependsOn ":protoc-plugin:shadowJar"
+            // This part is slightly gross, but necessary to ensure that shadowJar
+            // runs before the protoc invocation.
+            task.inputs.files(configurations.pluginConsumer)
         }
     }
 }
